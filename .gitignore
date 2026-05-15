@@ -18,3 +18,10 @@ data/
 # OS
 .DS_Store
 
+# Security
+master.key
+
+# Storage
+storage/
+backend/storage/
+
