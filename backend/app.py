@@ -10,8 +10,8 @@ from Crypto.Random import get_random_bytes
 from roles import role_permissions
 
 
-from encryption import MASTER_KEY, derive_role_key, encrypt_row, decrypt_row_columns
-from anomaly import pick_numeric_columns_from_rows, run_isolation_forest
+from encryption import MASTER_KEY, encrypt_row, decrypt_row_columns
+from anomaly import run_isolation_forest
 from utils import save_encrypted, load_encrypted
 
 app = FastAPI(title="BioSecureAI Option3")
@@ -42,11 +42,10 @@ async def upload_encrypt(file: UploadFile = File(...)):
     dataset_id = str(uuid.uuid4())[:8]
     encrypted_rows = []
 
-    # Use admin-derived key for storage encryption so admin can always decrypt
-    admin_key = derive_role_key("admin")
+    # Encrypt all rows using MASTER_KEY
     for _, row in df.iterrows():
         row_dict = {col: row[col] for col in all_columns}
-        enc = encrypt_row(admin_key, row)
+        enc = encrypt_row(MASTER_KEY, row_dict)
 
         encrypted_rows.append(enc)
 
@@ -70,8 +69,7 @@ async def analyze_role(
     # full columns
     all_columns = list(enc_rows[0].keys())
 
-    # ADMIN key decrypts safely for auto-detecting numeric values
-    admin_key = derive_role_key("admin")
+    admin_key = MASTER_KEY
 
     # decrypt only first row using admin for type detection
     first_dec = {}
@@ -94,14 +92,11 @@ async def analyze_role(
     permissions = role_permissions(all_columns, numeric_candidates)
     allowed = permissions.get(role, [])
 
-    # derive role key
-    role_key = derive_role_key(role)
-
     # decrypt allowed columns safely
     decrypted_rows = []
     for enc in enc_rows:
         try:
-            dec = decrypt_row_columns(role_key, enc, allowed)
+            dec = decrypt_row_columns(MASTER_KEY, enc, allowed)
         except:
             # if role is restricted from decrypting a column -> skip
             dec = {col: "ACCESS_DENIED" for col in allowed}
@@ -146,7 +141,7 @@ async def decrypt_full(dataset_id: str = Form(...), admin_key_present: str = For
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="dataset not found")
 
-    admin_key = derive_role_key("admin")
+    admin_key = MASTER_KEY
     all_columns = list(enc_rows[0].keys())
     out_rows = []
     for enc in enc_rows:
