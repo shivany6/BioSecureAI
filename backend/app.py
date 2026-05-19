@@ -13,6 +13,25 @@ from roles import role_permissions
 from encryption import MASTER_KEY, encrypt_row, decrypt_row_columns
 from anomaly import run_isolation_forest
 from db_utils import save_encrypted_db, load_encrypted_db
+from fastapi import Depends
+from sqlalchemy.orm import Session
+
+from database import SessionLocal
+from db_utils import (
+    create_user,
+    authenticate_user
+)
+
+from auth import create_access_token
+
+def get_db():
+    db = SessionLocal()
+
+    try:
+        yield db
+
+    finally:
+        db.close()
 
 
 app = FastAPI(title="BioSecureAI Option3")
@@ -187,5 +206,61 @@ async def encrypt_file(file: UploadFile = File(...)):
         "ciphertext_b64": base64.b64encode(ciphertext).decode(),
         "file_name": file.filename
     }
+
+from fastapi import Form
+
+@app.post("/register")
+def register(
+    username: str = Form(...),
+    email: str = Form(...),
+    password: str = Form(...),
+    role: str = Form(...),
+    db: Session = Depends(get_db)
+):
+
+    user = create_user(
+        db,
+        username,
+        email,
+        password,
+        role
+    )
+
+    return {
+        "message": "User created successfully",
+        "user_id": user.id
+    }
+
+@app.post("/login")
+def login(
+    username: str = Form(...),
+    password: str = Form(...),
+    db: Session = Depends(get_db)
+):
+
+    user = authenticate_user(
+        db,
+        username,
+        password
+    )
+
+    if not user:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid credentials"
+        )
+
+    token = create_access_token(
+        data={
+            "sub": user.username,
+            "role": user.role
+        }
+    )
+
+    return {
+        "access_token": token,
+        "token_type": "bearer"
+    }
+
 
 
