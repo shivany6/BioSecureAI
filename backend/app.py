@@ -12,7 +12,8 @@ from roles import role_permissions
 
 from encryption import MASTER_KEY, encrypt_row, decrypt_row_columns
 from anomaly import run_isolation_forest
-from utils import save_encrypted, load_encrypted
+from db_utils import save_encrypted_db, load_encrypted_db
+
 
 app = FastAPI(title="BioSecureAI Option3")
 
@@ -49,7 +50,7 @@ async def upload_encrypt(file: UploadFile = File(...)):
 
         encrypted_rows.append(enc)
 
-    save_encrypted(dataset_id, encrypted_rows)
+    save_encrypted_db(dataset_id, encrypted_rows)
     return {"status":"ok", "dataset_id": dataset_id, "columns": all_columns, "rows": len(encrypted_rows)}
 
 @app.post("/analyze_role")
@@ -59,7 +60,7 @@ async def analyze_role(
     contamination: float = Form(0.05)
 ):
     try:
-        enc_rows = load_encrypted(dataset_id)
+        enc_rows = load_encrypted_db(dataset_id)
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="dataset not found")
 
@@ -137,7 +138,7 @@ async def decrypt_full(dataset_id: str = Form(...), admin_key_present: str = For
         raise HTTPException(status_code=403, detail="admin_key missing")
 
     try:
-        enc_rows = load_encrypted(dataset_id)
+        enc_rows = load_encrypted_db(dataset_id)
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="dataset not found")
 
