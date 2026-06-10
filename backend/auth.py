@@ -1,26 +1,39 @@
 from datetime import datetime, timedelta
+import os
+
+from dotenv import load_dotenv
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
-SECRET_KEY = "biosecureai_secret_key"
+# Load environment variables
+load_dotenv()
+
+# Configuration
+SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
+if not SECRET_KEY:
+    raise ValueError("SECRET_KEY is not set. Please add it to your .env file.")
+
+# Password hashing context
 pwd_context = CryptContext(
     schemes=["bcrypt"],
     deprecated="auto"
 )
 
-def hash_password(password: str):
+def hash_password(password: str) -> str:
+    """Hash a plaintext password."""
     return pwd_context.hash(password)
 
-def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(
-        plain_password,
-        hashed_password
-    )
 
-def create_access_token(data: dict):
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verify a plaintext password against its hash."""
+    return pwd_context.verify(plain_password, hashed_password)
+
+
+def create_access_token(data: dict) -> str:
+
     to_encode = data.copy()
 
     expire = datetime.utcnow() + timedelta(
@@ -36,4 +49,17 @@ def create_access_token(data: dict):
     )
 
     return encoded_jwt
-    
+
+
+def verify_access_token(token: str):
+
+    try:
+        payload = jwt.decode(
+            token,
+            SECRET_KEY,
+            algorithms=[ALGORITHM]
+        )
+        return payload
+
+    except JWTError:
+        return None  

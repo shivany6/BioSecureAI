@@ -15,6 +15,7 @@ from anomaly import run_isolation_forest
 from db_utils import save_encrypted_db, load_encrypted_db
 from fastapi import Depends
 from sqlalchemy.orm import Session
+from auth_dependencies import get_current_user
 
 from database import SessionLocal
 from db_utils import (
@@ -49,7 +50,10 @@ def root():
     return {"message": "BioSecureAI Option3 backend running"}
 
 @app.post("/upload_encrypt")
-async def upload_encrypt(file: UploadFile = File(...)):
+async def upload_encrypt(
+    file: UploadFile = File(...),
+    current_user: dict = Depends(get_current_user)
+):
     """
     Upload CSV -> server reads it -> encrypts each row (per-cell) with admin-derived key -> store JSON -> return dataset_id & columns
     """
@@ -75,9 +79,10 @@ async def upload_encrypt(file: UploadFile = File(...)):
 @app.post("/analyze_role")
 async def analyze_role(
     dataset_id: str = Form(...),
-    role: str = Form(...),
+    current_user: dict = Depends(get_current_user),
     contamination: float = Form(0.05)
 ):
+    role = current_user["role"]
     try:
         enc_rows = load_encrypted_db(dataset_id)
     except FileNotFoundError:
@@ -149,26 +154,48 @@ async def analyze_role(
     })
 
 @app.post("/decrypt_full")
-async def decrypt_full(dataset_id: str = Form(...), admin_key_present: str = Form(...)):
-    """
-    Admin full decrypt. For dev we require admin_key_present non-empty (production: replace with real auth).
-    """
-    if not admin_key_present:
-        raise HTTPException(status_code=403, detail="admin_key missing")
+async def decrypt_full(
+    dataset_id: str = Form(...),
+    current_user: dict = Depends(get_current_user)
+):
+
+    # ONLY ADMIN ALLOWED
+    if current_user["role"] != "admin":
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied"
+        )
 
     try:
         enc_rows = load_encrypted_db(dataset_id)
+
     except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="dataset not found")
+        raise HTTPException(
+            status_code=404,
+            detail="dataset not found"
+        )
 
     admin_key = MASTER_KEY
+
     all_columns = list(enc_rows[0].keys())
+
     out_rows = []
+
     for enc in enc_rows:
-        dec_row = decrypt_row_columns(admin_key, enc, all_columns)
+
+        dec_row = decrypt_row_columns(
+            admin_key,
+            enc,
+            all_columns
+        )
+
         out_rows.append(dec_row)
 
-    return JSONResponse({"status":"ok", "dataset_id": dataset_id, "rows": out_rows})
+    return JSONResponse({
+        "status": "ok",
+        "dataset_id": dataset_id,
+        "rows": out_rows
+    })
 
 @app.get("/get_master_key_dev")
 def get_master_key_dev():
@@ -261,6 +288,4 @@ def login(
         "access_token": token,
         "token_type": "bearer"
     }
-
-
-
+    
