@@ -8,8 +8,6 @@ import base64
 from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
 from roles import role_permissions
-
-
 from encryption import MASTER_KEY, encrypt_row, decrypt_row_columns
 from anomaly import run_isolation_forest
 from db_utils import save_encrypted_db, load_encrypted_db
@@ -34,8 +32,7 @@ def get_db():
     finally:
         db.close()
 
-
-app = FastAPI(title="BioSecureAI Option3")
+app = FastAPI(title="BioSecureAI")
 
 app.add_middleware(
     CORSMiddleware,
@@ -47,7 +44,11 @@ app.add_middleware(
 
 @app.get("/")
 def root():
-    return {"message": "BioSecureAI Option3 backend running"}
+    return {
+        "application": "BioSecureAI",
+        "status": "running",
+        "version": "1.0.0"
+    }
 
 @app.post("/upload_encrypt")
 async def upload_encrypt(
@@ -197,10 +198,6 @@ async def decrypt_full(
         "rows": out_rows
     })
 
-@app.get("/get_master_key_dev")
-def get_master_key_dev():
-    """DEV only: return base64 encoded master key. REMOVE for public deployment."""
-    return {"master_key_b64": base64.b64encode(MASTER_KEY).decode()}
 @app.post("/encrypt_file")
 async def encrypt_file(file: UploadFile = File(...)):
     """
@@ -233,8 +230,6 @@ async def encrypt_file(file: UploadFile = File(...)):
         "ciphertext_b64": base64.b64encode(ciphertext).decode(),
         "file_name": file.filename
     }
-
-from fastapi import Form
 
 @app.post("/register")
 def register(
