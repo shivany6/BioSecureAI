@@ -2,35 +2,45 @@
 
 def role_permissions(columns, numeric_columns):
     """
-    Dynamically compute allowed columns per role.
-
-    columns = all CSV columns (strings)
-    numeric_columns = auto-detected float/int columns
+    Dynamic RBAC permissions.
     """
 
-    # Identify personal / identity columns safely
-    personal_keys = ["id", "patient_id", "name", "patient", "identifier"]
-    personal = [c for c in columns if c.lower() in personal_keys]
+    # Personal identity fields
+    personal_keywords = ["id", "patient_id", "name"]
 
-    # Identify diagnosis-related columns
-    diagnosis_keys = ["diagnosis", "diagnosis_label"]
-    diagnosis_cols = [c for c in columns if c.lower() in diagnosis_keys]
+    personal_cols = [
+        c for c in columns
+        if c.lower() in personal_keywords
+    ]
 
-    # Medical = everything except personal
-    medical = [c for c in columns if c not in personal]
+    # Diagnosis fields
+    diagnosis_keywords = ["diagnosis"]
+
+    diagnosis_cols = [
+        c for c in columns
+        if c.lower() in diagnosis_keywords
+    ]
+
+    # Medical columns
+    medical_cols = [
+        c for c in columns
+        if c not in personal_cols
+    ]
 
     return {
-        # FULL ACCESS — decrypts everything
+
+        # Full access
         "admin": columns,
 
-        # DOCTOR: medical + diagnosis (cannot see identity)
-        "doctor": list(set(medical + diagnosis_cols)),
+        # Doctor sees diagnosis + medical metrics
+        "doctor": diagnosis_cols + numeric_columns[:10],
 
-        # LAB TECHNICIAN: numeric columns only
-        "lab": numeric_columns,
+        # Lab sees only numeric lab metrics
+        "lab": numeric_columns[:6],
 
-        # RESEARCHER: numeric columns only + anomaly scores (frontend shows scores)
-        "researcher": numeric_columns
+        # Researcher sees anonymized analytics only
+        "researcher": numeric_columns[:4]
     }
+    
 
 

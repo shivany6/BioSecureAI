@@ -14,11 +14,14 @@ from db_utils import save_encrypted_db, load_encrypted_db
 from fastapi import Depends
 from sqlalchemy.orm import Session
 from auth_dependencies import get_current_user
+from schemas import PatientCreate, PatientResponse
+from fastapi import status
 
 from database import SessionLocal
 from db_utils import (
     create_user,
-    authenticate_user
+    authenticate_user,
+    create_patient
 )
 
 from auth import create_access_token
@@ -283,4 +286,37 @@ def login(
         "access_token": token,
         "token_type": "bearer"
     }
+
+@app.post(
+    "/patients",
+    response_model=PatientResponse,
+    status_code=status.HTTP_201_CREATED
+)
+def add_patient(
+    patient: PatientCreate,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    # RBAC check
+    allowed_roles = ["admin", "doctor", "receptionist"]
+
+    if current_user["role"] not in allowed_roles:
+        raise HTTPException(
+            status_code=403,
+            detail="You are not allowed to create patients."
+        )
+
+    # Create patient
+    new_patient = create_patient(
+        db=db,
+        first_name=patient.first_name,
+        last_name=patient.last_name,
+        date_of_birth=patient.date_of_birth,
+        gender=patient.gender,
+        phone=patient.phone,
+        email=patient.email,
+        address=patient.address
+    )
+
+    return new_patient
     
