@@ -14,15 +14,24 @@ from db_utils import save_encrypted_db, load_encrypted_db
 from fastapi import Depends
 from sqlalchemy.orm import Session
 from auth_dependencies import get_current_user
-from schemas import PatientCreate, PatientResponse
+from schemas import (
+    PatientCreate,
+    PatientResponse,
+    PatientUpdate
+)
 from fastapi import status
 
 from database import SessionLocal
 from db_utils import (
     create_user,
     authenticate_user,
-    create_patient
+    create_patient,
+    get_all_patients,
+    get_patient_by_id,
+    update_patient,
+    create_audit_log
 )
+
 
 from auth import create_access_token
 
@@ -319,4 +328,132 @@ def add_patient(
     )
 
     return new_patient
+
+@app.get(
+    "/patients",
+    response_model=list[PatientResponse]
+)
+def get_patients(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    allowed_roles = [
+        "admin",
+        "doctor",
+        "receptionist"
+    ]
+
+    if current_user["role"] not in allowed_roles:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied"
+        )
+
+    return get_all_patients(db)
+
+@app.get(
+    "/patients/{patient_id}",
+    response_model=PatientResponse
+)
+def get_patient(
+    patient_id: str,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    allowed_roles = [
+        "admin",
+        "doctor",
+        "receptionist"
+    ]
+
+    if current_user["role"] not in allowed_roles:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied"
+        )
+
+    patient = get_patient_by_id(
+        db,
+        patient_id
+    )
+
+    if not patient:
+        raise HTTPException(
+            status_code=404,
+            detail="Patient not found"
+        )
+
+    return patient
+
+@app.put(
+    "/patients/{patient_id}",
+    response_model=PatientResponse
+)
+def edit_patient(
+    patient_id: str,
+    patient_data: PatientUpdate,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    allowed_roles = [
+        "admin",
+        "doctor",
+        "receptionist"
+    ]
+
+    if current_user["role"] not in allowed_roles:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied"
+        )
+
+    patient = get_patient_by_id(
+        db,
+        patient_id
+    )
+
+    if not patient:
+        raise HTTPException(
+            status_code=404,
+            detail="Patient not found"
+        )
+
+    update_data = patient_data.model_dump(
+        exclude_unset=True
+    )
+
+    old_values = {}
+
+    for field in update_data.keys():
+        old_values[field] = getattr(
+            patient,
+            field
+        )
+
+    updated_patient = update_patient(
+        db,
+        patient,
+        patient_data
+    )
+
+    for field, new_value in update_data.items():
+
+        old_value = old_values[field]
+
+        if str(old_value) != str(new_value):
+
+            create_audit_log(
+                db=db,
+                patient_id=patient.patient_id,
+                changed_by=current_user["username"],
+                user_role=current_user["role"],
+                field_name=field,
+                old_value=old_value,
+                new_value=new_value
+            )
+
+    return updated_patient
     

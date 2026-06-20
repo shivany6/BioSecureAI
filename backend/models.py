@@ -41,22 +41,15 @@ class Patient(Base):
     __tablename__ = "patients"
 
     id = Column(Integer, primary_key=True, index=True)
-
     patient_id = Column(String(20), unique=True, index=True, nullable=False)
-
     first_name = Column(String(100), nullable=False)
-
     last_name = Column(String(100), nullable=False)
-
     date_of_birth = Column(Date, nullable=False)
-
     gender = Column(String(20), nullable=False)
-
     phone = Column(String(20))
-
     email = Column(String(255))
-
-    address = Column(Text)
+    address = Column(Text)   
+    record_hash = Column(String(255))
 
     created_at = Column(
     DateTime,
@@ -70,4 +63,18 @@ class Patient(Base):
         onupdate=datetime.utcnow
     )
 
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    patient_id = Column(String(20), nullable=False)
+    changed_by = Column(String(50), nullable=False)
+    user_role = Column(String(30), nullable=False)
+    field_name = Column(String(100), nullable=False)
+    old_value = Column(Text)
+    new_value = Column(Text)
+    timestamp = Column(
+        DateTime,
+        default=datetime.utcnow
+    )
     

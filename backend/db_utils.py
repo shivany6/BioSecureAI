@@ -4,7 +4,7 @@ import json
 from database import SessionLocal
 from models import EncryptedDataset
 from sqlalchemy.orm import Session
-from models import User, Patient
+from models import User, Patient, AuditLog
 from auth import hash_password
 
 def create_user(
@@ -109,5 +109,60 @@ def create_patient(
     db.refresh(patient)
 
     return patient
+
+def get_all_patients(db: Session):
+    return db.query(Patient).all()
+
+def get_patient_by_id(
+    db: Session,
+    patient_id: str
+):
+    return db.query(Patient).filter(
+        Patient.patient_id == patient_id
+    ).first()
+
+def update_patient(
+    db: Session,
+    patient,
+    patient_data
+):
+    update_data = patient_data.model_dump(
+        exclude_unset=True
+    )
+
+    for field, value in update_data.items():
+        setattr(
+            patient,
+            field,
+            value
+        )
+
+    db.commit()
+    db.refresh(patient)
+
+    return patient
+
+def create_audit_log(
+    db: Session,
+    patient_id: str,
+    changed_by: str,
+    user_role: str,
+    field_name: str,
+    old_value,
+    new_value
+):
+    log = AuditLog(
+        patient_id=patient_id,
+        changed_by=changed_by,
+        user_role=user_role,
+        field_name=field_name,
+        old_value=str(old_value) if old_value is not None else None,
+        new_value=str(new_value) if new_value is not None else None
+    )
+
+    db.add(log)
+    db.commit()
+    db.refresh(log)
+
+    return log
     
-        

@@ -27,4 +27,13 @@ class PatientResponse(BaseModel):
     address: Optional[str]
 
     model_config = ConfigDict(from_attributes=True)
+
+class PatientUpdate(BaseModel):
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    date_of_birth: Optional[date] = None
+    gender: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    address: Optional[str] = None
     
