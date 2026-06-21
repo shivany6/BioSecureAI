@@ -4,8 +4,15 @@ import json
 from database import SessionLocal
 from models import EncryptedDataset
 from sqlalchemy.orm import Session
-from models import User, Patient, AuditLog
+from models import (
+    User,
+    Patient,
+    AuditLog,
+    MedicalField,
+    MedicalRecord
+)
 from auth import hash_password
+from integrity import generate_patient_hash
 
 def create_user(
     db: Session,
@@ -93,15 +100,31 @@ def create_patient(
     email: str = None,
     address: str = None
 ):
+    generated_patient_id = (
+        f"PAT-{uuid.uuid4().hex[:8].upper()}"
+    )
+
+    record_hash = generate_patient_hash(
+        generated_patient_id,
+        first_name,
+        last_name,
+        date_of_birth,
+        gender,
+        phone,
+        email,
+        address
+    )
+
     patient = Patient(
-        patient_id=f"PAT-{uuid.uuid4().hex[:8].upper()}",
+        patient_id=generated_patient_id,
         first_name=first_name,
         last_name=last_name,
         date_of_birth=date_of_birth,
         gender=gender,
         phone=phone,
         email=email,
-        address=address
+        address=address,
+        record_hash=record_hash
     )
 
     db.add(patient)
@@ -165,4 +188,61 @@ def create_audit_log(
     db.refresh(log)
 
     return log
+def create_medical_field(
+    db: Session,
+    field_name: str,
+    field_type: str,
+    created_by: str
+):
+    field = MedicalField(
+        field_name=field_name,
+        field_type=field_type,
+        created_by=created_by
+    )
+
+    db.add(field)
+    db.commit()
+    db.refresh(field)
+
+    return field
+
+from integrity import generate_medical_record_hash
+
+
+def create_medical_record(
+    db: Session,
+    patient_id: str,
+    field_id: int,
+    value: str,
+    created_by: str
+):
+    record_hash = generate_medical_record_hash(
+        patient_id,
+        field_id,
+        value
+    )
+
+    record = MedicalRecord(
+        patient_id=patient_id,
+        field_id=field_id,
+        value=value,
+        record_hash=record_hash,
+        created_by=created_by
+    )
+
+    db.add(record)
+    db.commit()
+    db.refresh(record)
+
+    return record
+
+def get_medical_field(
+    db: Session,
+    field_id: int
+):
+    return db.query(MedicalField).filter(
+        MedicalField.id == field_id
+    ).first()
+       
+
     

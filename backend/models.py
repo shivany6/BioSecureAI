@@ -77,4 +77,73 @@ class AuditLog(Base):
         DateTime,
         default=datetime.utcnow
     )
+
+class MedicalField(Base):
+    __tablename__ = "medical_fields"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
+
+    field_name = Column(
+        String(100),
+        unique=True,
+        nullable=False
+    )
+
+    field_type = Column(
+        String(30),
+        nullable=False
+    )
+
+    created_by = Column(
+        String(50),
+        nullable=False
+    )
+
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow
+    )
+
+class MedicalRecord(Base):
+    __tablename__ = "medical_records"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
+
+    patient_id = Column(
+        String(20),
+        nullable=False
+    )
+
+    field_id = Column(
+        Integer,
+        nullable=False
+    )
+
+    value = Column(
+        Text,
+        nullable=False
+    )
+
+    record_hash = Column(
+        String(255),
+        nullable=False
+    )
+
+    created_by = Column(
+        String(50),
+        nullable=False
+    )
+
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow
+    )
     

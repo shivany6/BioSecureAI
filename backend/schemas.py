@@ -36,4 +36,44 @@ class PatientUpdate(BaseModel):
     phone: Optional[str] = None
     email: Optional[str] = None
     address: Optional[str] = None
+
+# Medical Field Creation Schema
+
+class MedicalFieldCreate(BaseModel):
+    field_name: str
+    field_type: str
+
+
+# Medical Field Response Schema
+
+class MedicalFieldResponse(BaseModel):
+    id: int
+    field_name: str
+    field_type: str
+    created_by: str
+
+    model_config = ConfigDict(
+        from_attributes=True
+    )
+
+# Medical Record Creation Schema
+
+class MedicalRecordCreate(BaseModel):
+    patient_id: str
+    field_id: int
+    value: str
+
+
+# Medical Record Response Schema
+
+class MedicalRecordResponse(BaseModel):
+    id: int
+    patient_id: str
+    field_id: int
+    value: str
+    created_by: str
+
+    model_config = ConfigDict(
+        from_attributes=True
+    )
     
