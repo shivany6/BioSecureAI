@@ -13,7 +13,7 @@ from anomaly import run_isolation_forest
 from db_utils import save_encrypted_db, load_encrypted_db
 from fastapi import Depends
 from sqlalchemy.orm import Session
-from integrity import verify_patient_integrity
+from integrity import verify_patient_integrity, verify_medical_record_integrity
 from auth_dependencies import get_current_user
 from schemas import (
     PatientCreate,
@@ -22,10 +22,10 @@ from schemas import (
     MedicalFieldCreate,
     MedicalFieldResponse,
     MedicalRecordCreate,
-    MedicalRecordResponse
+    MedicalRecordResponse,
+    MedicalRecordUpdate
 )
 from fastapi import status
-
 from database import SessionLocal
 from db_utils import (
     create_user,
@@ -34,10 +34,15 @@ from db_utils import (
     get_all_patients,
     get_patient_by_id,
     update_patient,
-    create_audit_log,
     create_medical_field,
     create_medical_record,
-    get_medical_field
+    get_medical_field,
+    get_medical_record_by_id,
+    update_medical_record,
+    create_audit_log,
+    get_medical_records_by_patient,
+    get_all_audit_logs,
+    get_audit_logs_by_patient
 )
 from auth import create_access_token
 
@@ -462,10 +467,288 @@ def verify_patient(
     current_user: dict = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    allowed_roles = [
+        "admin",
+        "doctor"
+    ]
+    if current_user["role"] not in allowed_roles:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied"
+        )
+    patient = get_patient_by_id(
+        db,
+        patient_id
+    )
+    if not patient:
+        raise HTTPException(
+            status_code=404,
+            detail="Patient not found"
+        )
+    is_valid = verify_patient_integrity(
+        patient
+    )
+    return {
+        "patient_id": patient.patient_id,
+        "integrity_status":
+            "VALID" if is_valid else "TAMPERED"
+    }
+@app.post(
+    "/medical-fields",
+    response_model=MedicalFieldResponse,
+    status_code=status.HTTP_201_CREATED
+)
+def add_medical_field(
+    field: MedicalFieldCreate,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    allowed_roles = [
+        "admin",
+        "doctor"
+    ]
+    if current_user["role"] not in allowed_roles:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied"
+        )
+    return create_medical_field(
+        db=db,
+        field_name=field.field_name,
+        field_type=field.field_type,
+        created_by=current_user["username"]
+    )
+@app.post(
+    "/medical-records",
+    response_model=MedicalRecordResponse,
+    status_code=status.HTTP_201_CREATED
+)
+def add_medical_record(
+    record: MedicalRecordCreate,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    allowed_roles = [
+        "admin",
+        "doctor",
+        "nurse"
+    ]
+    if current_user["role"] not in allowed_roles:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied"
+        )
+
+    field = get_medical_field(
+        db,
+        record.field_id
+    )
+    if not field:
+        raise HTTPException(
+            status_code=404,
+            detail="Medical field not found"
+        )
+    if field.field_type == "number":
+        try:
+            float(record.value)
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"{field.field_name} requires a numeric value"
+            )
+    return create_medical_record(
+        db=db,
+        patient_id=record.patient_id,
+        field_id=record.field_id,
+        value=record.value,
+        created_by=current_user["username"]
+    )
+
+@app.get(
+    "/medical-records/{record_id}/verify"
+)
+def verify_medical_record(
+    record_id: int,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    allowed_roles = [
+        "admin",
+        "doctor",
+        "nurse"
+    ]
+    if current_user["role"] not in allowed_roles:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied"
+        )
+    record = get_medical_record_by_id(
+        db,
+        record_id
+    )
+    if not record:
+        raise HTTPException(
+            status_code=404,
+            detail="Medical record not found"
+        )
+    return {
+        "record_id": record.id,
+        "integrity_status":
+            verify_medical_record_integrity(
+                record
+            )
+    }
+
+@app.put(
+    "/medical-records/{record_id}",
+    response_model=MedicalRecordResponse
+)
+def edit_medical_record(
+    record_id: int,
+    record_data: MedicalRecordUpdate,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    allowed_roles = [
+        "admin",
+        "doctor",
+        "nurse"
+    ]
+    if current_user["role"] not in allowed_roles:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied"
+        )
+    record = get_medical_record_by_id(
+        db,
+        record_id
+    )
+    if not record:
+        raise HTTPException(
+            status_code=404,
+            detail="Medical record not found"
+        )
+    old_value = record.value
+    field = get_medical_field(
+    db,
+    record.field_id
+    )
+    create_audit_log(
+    db=db,
+    patient_id=record.patient_id,
+    changed_by=current_user["username"],
+    user_role=current_user["role"],
+    field_name=field.field_name,
+    old_value=old_value,
+    new_value=record_data.value
+    )
+
+    return update_medical_record(
+        db,
+        record,
+        record_data.value
+    )
+
+@app.get(
+    "/patients/{patient_id}/medical-records"
+)
+def get_patient_medical_records(
+    patient_id: str,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    allowed_roles = [
+        "admin",
+        "doctor",
+        "nurse"
+    ]
+    if current_user["role"] not in allowed_roles:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied"
+        )
+    patient = get_patient_by_id(
+        db,
+        patient_id
+    )
+    if not patient:
+        raise HTTPException(
+            status_code=404,
+            detail="Patient not found"
+        )
+    records = get_medical_records_by_patient(
+        db,
+        patient_id
+    )
+    result = []
+    for record in records:
+        field = get_medical_field(
+            db,
+            record.field_id
+        )
+        result.append(
+            {
+                "record_id": record.id,
+                "field_name": field.field_name,
+                "field_type": field.field_type,
+                "value": record.value,
+                "created_by": record.created_by,
+                "created_at": record.created_at
+            }
+        )
+    return result
+
+@app.get("/audit-logs")
+def view_audit_logs(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
 
     allowed_roles = [
         "admin",
         "doctor"
+    ]
+
+    if current_user["role"] not in allowed_roles:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied"
+        )
+
+    logs = get_all_audit_logs(db)
+
+    result = []
+
+    for log in logs:
+
+        result.append(
+            {
+                "id": log.id,
+                "patient_id": log.patient_id,
+                "changed_by": log.changed_by,
+                "user_role": log.user_role,
+                "field_name": log.field_name,
+                "old_value": log.old_value,
+                "new_value": log.new_value,
+                "timestamp": log.timestamp
+            }
+        )
+
+    return result
+
+@app.get(
+    "/patients/{patient_id}/audit-logs"
+)
+def get_patient_audit_logs(
+    patient_id: str,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    allowed_roles = [
+        "admin",
+        "doctor",
+        "nurse"
     ]
 
     if current_user["role"] not in allowed_roles:
@@ -485,94 +768,25 @@ def verify_patient(
             detail="Patient not found"
         )
 
-    is_valid = verify_patient_integrity(
-        patient
-    )
-
-    return {
-        "patient_id": patient.patient_id,
-        "integrity_status":
-            "VALID" if is_valid else "TAMPERED"
-    }
-
-@app.post(
-    "/medical-fields",
-    response_model=MedicalFieldResponse,
-    status_code=status.HTTP_201_CREATED
-)
-def add_medical_field(
-    field: MedicalFieldCreate,
-    current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-
-    allowed_roles = [
-        "admin",
-        "doctor"
-    ]
-
-    if current_user["role"] not in allowed_roles:
-        raise HTTPException(
-            status_code=403,
-            detail="Access denied"
-        )
-
-    return create_medical_field(
-        db=db,
-        field_name=field.field_name,
-        field_type=field.field_type,
-        created_by=current_user["username"]
-    )
-@app.post(
-    "/medical-records",
-    response_model=MedicalRecordResponse,
-    status_code=status.HTTP_201_CREATED
-)
-def add_medical_record(
-    record: MedicalRecordCreate,
-    current_user: dict = Depends(get_current_user),
-    db: Session = Depends(get_db)
-):
-
-    allowed_roles = [
-        "admin",
-        "doctor",
-        "nurse"
-    ]
-
-    if current_user["role"] not in allowed_roles:
-        raise HTTPException(
-            status_code=403,
-            detail="Access denied"
-        )
-
-    field = get_medical_field(
+    logs = get_audit_logs_by_patient(
         db,
-        record.field_id
+        patient_id
     )
 
-    if not field:
-        raise HTTPException(
-            status_code=404,
-            detail="Medical field not found"
+    result = []
+
+    for log in logs:
+
+        result.append(
+            {
+                "id": log.id,
+                "field_name": log.field_name,
+                "old_value": log.old_value,
+                "new_value": log.new_value,
+                "changed_by": log.changed_by,
+                "user_role": log.user_role,
+                "timestamp": log.timestamp
+            }
         )
 
-    if field.field_type == "number":
-        try:
-            float(record.value)
-        except ValueError:
-            raise HTTPException(
-                status_code=400,
-                detail=f"{field.field_name} requires a numeric value"
-            )
-
-    return create_medical_record(
-        db=db,
-        patient_id=record.patient_id,
-        field_id=record.field_id,
-        value=record.value,
-        created_by=current_user["username"]
-    )
-    
-
-    
+    return result

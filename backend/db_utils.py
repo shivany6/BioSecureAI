@@ -13,6 +13,7 @@ from models import (
 )
 from auth import hash_password
 from integrity import generate_patient_hash
+from integrity import generate_medical_record_hash
 
 def create_user(
     db: Session,
@@ -236,6 +237,26 @@ def create_medical_record(
 
     return record
 
+def update_medical_record(
+    db: Session,
+    record,
+    new_value: str
+):
+    record.value = new_value
+
+    record.record_hash = (
+        generate_medical_record_hash(
+            record.patient_id,
+            record.field_id,
+            new_value
+        )
+    )
+
+    db.commit()
+    db.refresh(record)
+
+    return record
+
 def get_medical_field(
     db: Session,
     field_id: int
@@ -243,6 +264,33 @@ def get_medical_field(
     return db.query(MedicalField).filter(
         MedicalField.id == field_id
     ).first()
-       
 
+def get_medical_record_by_id(
+    db: Session,
+    record_id: int
+):
+    return db.query(MedicalRecord).filter(
+        MedicalRecord.id == record_id
+    ).first()
+
+def get_medical_records_by_patient(
+    db: Session,
+    patient_id: str
+):
+    return db.query(MedicalRecord).filter(
+        MedicalRecord.patient_id == patient_id
+    ).all()
+
+def get_all_audit_logs(
+    db: Session
+):
+    return db.query(AuditLog).all()
+    
+def get_audit_logs_by_patient(
+    db: Session,
+    patient_id: str
+):
+    return db.query(AuditLog).filter(
+        AuditLog.patient_id == patient_id
+    ).all()
     

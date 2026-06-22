@@ -76,4 +76,6 @@ class MedicalRecordResponse(BaseModel):
     model_config = ConfigDict(
         from_attributes=True
     )
+class MedicalRecordUpdate(BaseModel):
+    value: str
     

@@ -56,4 +56,17 @@ def generate_medical_record_hash(
     return hashlib.sha256(
         data.encode()
     ).hexdigest()
+
+def verify_medical_record_integrity(record):
+
+    current_hash = generate_medical_record_hash(
+        record.patient_id,
+        record.field_id,
+        record.value
+    )
+
+    if current_hash == record.record_hash:
+        return "VALID"
+
+    return "TAMPERED"
     
