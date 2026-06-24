@@ -9,7 +9,9 @@ from models import (
     Patient,
     AuditLog,
     MedicalField,
-    MedicalRecord
+    MedicalRecord,
+    Appointment,
+    Prescription
 )
 from auth import hash_password
 from integrity import generate_patient_hash
@@ -293,4 +295,148 @@ def get_audit_logs_by_patient(
     return db.query(AuditLog).filter(
         AuditLog.patient_id == patient_id
     ).all()
+def create_appointment(
+    db: Session,
+    patient_id: str,
+    doctor_username: str,
+    appointment_date,
+    appointment_time,
+    reason: str,
+    created_by: str
+):
+    appointment = Appointment(
+        appointment_id=f"APT-{uuid.uuid4().hex[:8].upper()}",
+        patient_id=patient_id,
+        doctor_username=doctor_username,
+        appointment_date=appointment_date,
+        appointment_time=appointment_time,
+        reason=reason,
+        created_by=created_by
+    )
+
+    db.add(appointment)
+    db.commit()
+    db.refresh(appointment)
+
+    return appointment
+def get_all_appointments(
+    db: Session
+):
+    return db.query(
+        Appointment
+    ).all()
+def get_patient_appointments(
+    db: Session,
+    patient_id: str
+):
+    return db.query(
+        Appointment
+    ).filter(
+        Appointment.patient_id == patient_id
+    ).all()
+def get_appointment_by_id(
+    db: Session,
+    appointment_id: str
+):
+    return db.query(
+        Appointment
+    ).filter(
+        Appointment.appointment_id == appointment_id
+    ).first()
+def update_appointment(
+    db: Session,
+    appointment,
+    appointment_data
+):
+    update_data = appointment_data.model_dump(
+        exclude_unset=True
+    )
+
+    for field, value in update_data.items():
+        setattr(
+            appointment,
+            field,
+            value
+        )
+    db.commit()
+    db.refresh(appointment)
+
+    return appointment
+def create_prescription(
+    db: Session,
+    patient_id: str,
+    doctor_username: str,
+    medication_name: str,
+    dosage: str,
+    frequency: str,
+    duration: str,
+    instructions: str
+):
+
+    prescription = Prescription(
+        prescription_id=f"RX-{uuid.uuid4().hex[:8].upper()}",
+        patient_id=patient_id,
+        doctor_username=doctor_username,
+        medication_name=medication_name,
+        dosage=dosage,
+        frequency=frequency,
+        duration=duration,
+        instructions=instructions
+    )
+    db.add(prescription)
+    db.commit()
+    db.refresh(prescription)
+    return prescription
+
+def get_all_prescriptions(
+    db: Session
+):
+    return db.query(
+        Prescription
+    ).all()
+def get_patient_prescriptions(
+    db: Session,
+    patient_id: str
+):
+    return db.query(
+        Prescription
+    ).filter(
+        Prescription.patient_id == patient_id
+    ).all()
+def get_prescription_by_id(
+    db: Session,
+    prescription_id: str
+):
+    return db.query(
+        Prescription
+    ).filter(
+        Prescription.prescription_id == prescription_id
+    ).first()
+def update_prescription(
+    db: Session,
+    prescription,
+    prescription_data
+):
+
+    update_data = prescription_data.model_dump(
+        exclude_unset=True
+    )
+
+    for field, value in update_data.items():
+
+        setattr(
+            prescription,
+            field,
+            value
+        )
+
+    db.commit()
+
+    db.refresh(
+        prescription
+    )
+
+    return prescription
+    
+
     

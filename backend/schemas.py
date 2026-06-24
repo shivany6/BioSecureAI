@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, time
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
@@ -78,4 +78,67 @@ class MedicalRecordResponse(BaseModel):
     )
 class MedicalRecordUpdate(BaseModel):
     value: str
+class AppointmentCreate(BaseModel):
+    patient_id: str
+    doctor_username: str
+    appointment_date: date
+    appointment_time: time
+    reason: str | None = None
+class AppointmentResponse(BaseModel):
+    appointment_id: str
+    patient_id: str
+    doctor_username: str
+    appointment_date: date
+    appointment_time: time
+    reason: str | None = None
+    status: str
+    created_by: str
+
+    model_config = ConfigDict(
+        from_attributes=True
+    )
+class AppointmentUpdate(BaseModel):
+    appointment_date: date | None = None
+    appointment_time: time | None = None
+    reason: str | None = None
+    status: str | None = None
+class PrescriptionCreate(BaseModel):
+    patient_id: str
+    medication_name: str
+    dosage: str
+    frequency: str
+    duration: str
+    instructions: str | None = None
+class PrescriptionResponse(BaseModel):
+
+    prescription_id: str
+
+    patient_id: str
+
+    doctor_username: str
+
+    medication_name: str
+
+    dosage: str
+
+    frequency: str
+
+    duration: str
+
+    instructions: str | None = None
+
+    model_config = ConfigDict(
+        from_attributes=True
+    )
+class PrescriptionUpdate(BaseModel):
+
+    medication_name: str | None = None
+
+    dosage: str | None = None
+
+    frequency: str | None = None
+
+    duration: str | None = None
+
+    instructions: str | None = None
     

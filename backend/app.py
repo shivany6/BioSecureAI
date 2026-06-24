@@ -23,7 +23,13 @@ from schemas import (
     MedicalFieldResponse,
     MedicalRecordCreate,
     MedicalRecordResponse,
-    MedicalRecordUpdate
+    MedicalRecordUpdate,
+    AppointmentCreate,
+    AppointmentResponse,
+    AppointmentUpdate,
+    PrescriptionCreate,
+    PrescriptionResponse,
+    PrescriptionUpdate
 )
 from fastapi import status
 from database import SessionLocal
@@ -42,7 +48,17 @@ from db_utils import (
     create_audit_log,
     get_medical_records_by_patient,
     get_all_audit_logs,
-    get_audit_logs_by_patient
+    get_audit_logs_by_patient,
+    create_appointment,
+    get_all_appointments,
+    get_patient_appointments,
+    get_appointment_by_id,
+    update_appointment,
+    create_prescription,
+    get_all_prescriptions,
+    get_patient_prescriptions,
+    get_prescription_by_id,
+    update_prescription
 )
 from auth import create_access_token
 
@@ -174,14 +190,12 @@ async def decrypt_full(
     dataset_id: str = Form(...),
     current_user: dict = Depends(get_current_user)
 ):
-
     # ONLY ADMIN ALLOWED
     if current_user["role"] != "admin":
         raise HTTPException(
             status_code=403,
             detail="Access denied"
         )
-
     try:
         enc_rows = load_encrypted_db(dataset_id)
 
@@ -190,7 +204,6 @@ async def decrypt_full(
             status_code=404,
             detail="dataset not found"
         )
-
     admin_key = MASTER_KEY
 
     all_columns = list(enc_rows[0].keys())
@@ -790,3 +803,284 @@ def get_patient_audit_logs(
         )
 
     return result
+
+@app.post(
+    "/appointments",
+    response_model=AppointmentResponse,
+    status_code=status.HTTP_201_CREATED
+)
+def create_new_appointment(
+    appointment_data: AppointmentCreate,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    allowed_roles = [
+        "admin",
+        "receptionist"
+    ]
+
+    if current_user["role"] not in allowed_roles:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied"
+        )
+
+    patient = get_patient_by_id(
+        db,
+        appointment_data.patient_id
+    )
+
+    if not patient:
+        raise HTTPException(
+            status_code=404,
+            detail="Patient not found"
+        )
+
+    return create_appointment(
+        db=db,
+        patient_id=appointment_data.patient_id,
+        doctor_username=appointment_data.doctor_username,
+        appointment_date=appointment_data.appointment_date,
+        appointment_time=appointment_data.appointment_time,
+        reason=appointment_data.reason,
+        created_by=current_user["username"]
+    )
+@app.get(
+    "/appointments",
+    response_model=list[AppointmentResponse]
+)
+def get_appointments(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    allowed_roles = [
+        "admin",
+        "receptionist"
+    ]
+
+    if current_user["role"] not in allowed_roles:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied"
+        )
+
+    return get_all_appointments(db)
+@app.get(
+    "/patients/{patient_id}/appointments",
+    response_model=list[AppointmentResponse]
+)
+def get_patient_appointment_history(
+    patient_id: str,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    allowed_roles = [
+        "admin",
+        "doctor",
+        "nurse",
+        "receptionist"
+    ]
+
+    if current_user["role"] not in allowed_roles:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied"
+        )
+
+    patient = get_patient_by_id(
+        db,
+        patient_id
+    )
+
+    if not patient:
+        raise HTTPException(
+            status_code=404,
+            detail="Patient not found"
+        )
+
+    return get_patient_appointments(
+        db,
+        patient_id
+    )
+@app.put(
+    "/appointments/{appointment_id}",
+    response_model=AppointmentResponse
+)
+def edit_appointment(
+    appointment_id: str,
+    appointment_data: AppointmentUpdate,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    allowed_roles = [
+        "admin",
+        "receptionist"
+    ]
+
+    if current_user["role"] not in allowed_roles:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied"
+        )
+
+    appointment = get_appointment_by_id(
+        db,
+        appointment_id
+    )
+
+    if not appointment:
+        raise HTTPException(
+            status_code=404,
+            detail="Appointment not found"
+        )
+
+    return update_appointment(
+        db,
+        appointment,
+        appointment_data
+    )
+@app.post(
+    "/prescriptions",
+    response_model=PrescriptionResponse,
+    status_code=status.HTTP_201_CREATED
+)
+def create_new_prescription(
+    prescription_data: PrescriptionCreate,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    allowed_roles = [
+        "admin",
+        "doctor"
+    ]
+
+    if current_user["role"] not in allowed_roles:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied"
+        )
+
+    patient = get_patient_by_id(
+        db,
+        prescription_data.patient_id
+    )
+
+    if not patient:
+        raise HTTPException(
+            status_code=404,
+            detail="Patient not found"
+        )
+
+    return create_prescription(
+        db=db,
+        patient_id=prescription_data.patient_id,
+        doctor_username=current_user["username"],
+        medication_name=prescription_data.medication_name,
+        dosage=prescription_data.dosage,
+        frequency=prescription_data.frequency,
+        duration=prescription_data.duration,
+        instructions=prescription_data.instructions
+    )
+@app.get(
+    "/prescriptions",
+    response_model=list[PrescriptionResponse]
+)
+def get_prescriptions(
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    allowed_roles = [
+        "admin",
+        "doctor"
+    ]
+
+    if current_user["role"] not in allowed_roles:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied"
+        )
+
+    return get_all_prescriptions(db)
+@app.get(
+    "/patients/{patient_id}/prescriptions",
+    response_model=list[PrescriptionResponse]
+)
+def get_patient_prescription_history(
+    patient_id: str,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    allowed_roles = [
+        "admin",
+        "doctor",
+        "nurse"
+    ]
+
+    if current_user["role"] not in allowed_roles:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied"
+        )
+
+    patient = get_patient_by_id(
+        db,
+        patient_id
+    )
+
+    if not patient:
+        raise HTTPException(
+            status_code=404,
+            detail="Patient not found"
+        )
+
+    return get_patient_prescriptions(
+        db,
+        patient_id
+    )
+@app.put(
+    "/prescriptions/{prescription_id}",
+    response_model=PrescriptionResponse
+)
+def edit_prescription(
+    prescription_id: str,
+    prescription_data: PrescriptionUpdate,
+    current_user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    allowed_roles = [
+        "admin",
+        "doctor"
+    ]
+
+    if current_user["role"] not in allowed_roles:
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied"
+        )
+
+    prescription = get_prescription_by_id(
+        db,
+        prescription_id
+    )
+
+    if not prescription:
+        raise HTTPException(
+            status_code=404,
+            detail="Prescription not found"
+        )
+
+    return update_prescription(
+        db,
+        prescription,
+        prescription_data
+    )
+    
+

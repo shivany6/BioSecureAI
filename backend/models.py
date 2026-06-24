@@ -1,4 +1,13 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, Date
+from sqlalchemy import (
+    Column,
+    Integer,
+    String,
+    Date,
+    Time,
+    DateTime,
+    Text
+)
+
 from database import Base
 from datetime import datetime
 
@@ -140,6 +149,113 @@ class MedicalRecord(Base):
     created_by = Column(
         String(50),
         nullable=False
+    )
+
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow
+    )
+
+class Appointment(Base):
+    __tablename__ = "appointments"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
+
+    appointment_id = Column(
+        String(20),
+        unique=True,
+        nullable=False
+    )
+
+    patient_id = Column(
+        String(20),
+        nullable=False
+    )
+
+    doctor_username = Column(
+        String(50),
+        nullable=False
+    )
+
+    appointment_date = Column(
+        Date,
+        nullable=False
+    )
+
+    appointment_time = Column(
+        Time,
+        nullable=False
+    )
+
+    reason = Column(
+        Text
+    )
+
+    status = Column(
+        String(30),
+        default="Scheduled"
+    )
+
+    created_by = Column(
+        String(50),
+        nullable=False
+    )
+
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow
+    )
+class Prescription(Base):
+    __tablename__ = "prescriptions"
+
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
+
+    prescription_id = Column(
+        String(20),
+        unique=True,
+        nullable=False
+    )
+
+    patient_id = Column(
+        String(20),
+        nullable=False
+    )
+
+    doctor_username = Column(
+        String(50),
+        nullable=False
+    )
+
+    medication_name = Column(
+        String(200),
+        nullable=False
+    )
+
+    dosage = Column(
+        String(100),
+        nullable=False
+    )
+
+    frequency = Column(
+        String(100),
+        nullable=False
+    )
+
+    duration = Column(
+        String(100),
+        nullable=False
+    )
+
+    instructions = Column(
+        Text
     )
 
     created_at = Column(
