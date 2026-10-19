@@ -1,4 +1,5 @@
 # app.py
+from routers.auth_routes import router as auth_router
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -70,6 +71,7 @@ def get_db():
         db.close()
 
 app = FastAPI(title="BioSecureAI")
+app.include_router(auth_router)
 
 app.add_middleware(
     CORSMiddleware,
@@ -257,59 +259,6 @@ async def encrypt_file(file: UploadFile = File(...)):
         "tag_b64": base64.b64encode(tag).decode(),
         "ciphertext_b64": base64.b64encode(ciphertext).decode(),
         "file_name": file.filename
-    }
-
-@app.post("/register")
-def register(
-    username: str = Form(...),
-    email: str = Form(...),
-    password: str = Form(...),
-    role: str = Form(...),
-    db: Session = Depends(get_db)
-):
-
-    user = create_user(
-        db,
-        username,
-        email,
-        password,
-        role
-    )
-
-    return {
-        "message": "User created successfully",
-        "user_id": user.id
-    }
-
-@app.post("/login")
-def login(
-    username: str = Form(...),
-    password: str = Form(...),
-    db: Session = Depends(get_db)
-):
-
-    user = authenticate_user(
-        db,
-        username,
-        password
-    )
-
-    if not user:
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid credentials"
-        )
-
-    token = create_access_token(
-        data={
-            "sub": user.username,
-            "role": user.role
-        }
-    )
-
-    return {
-        "access_token": token,
-        "token_type": "bearer"
     }
 
 @app.post(
@@ -529,6 +478,7 @@ def add_medical_field(
         db=db,
         field_name=field.field_name,
         field_type=field.field_type,
+        ai_enabled=field.ai_enabled,
         created_by=current_user["username"]
     )
 @app.post(
