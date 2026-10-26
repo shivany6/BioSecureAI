@@ -10,6 +10,7 @@ from sqlalchemy import (
 
 from database import Base
 from datetime import datetime
+from sqlalchemy import Boolean
 
 class EncryptedDataset(Base):
 
@@ -95,23 +96,20 @@ class MedicalField(Base):
         primary_key=True,
         index=True
     )
-
     field_name = Column(
         String(100),
         unique=True,
         nullable=False
     )
-
     field_type = Column(
         String(30),
         nullable=False
     )
-
+    
     created_by = Column(
         String(50),
         nullable=False
     )
-
     created_at = Column(
         DateTime,
         default=datetime.utcnow

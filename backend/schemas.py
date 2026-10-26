@@ -42,7 +42,8 @@ class PatientUpdate(BaseModel):
 class MedicalFieldCreate(BaseModel):
     field_name: str
     field_type: str
-
+    ai_enabled: bool = True
+    
 
 # Medical Field Response Schema
 
@@ -110,23 +111,14 @@ class PrescriptionCreate(BaseModel):
     duration: str
     instructions: str | None = None
 class PrescriptionResponse(BaseModel):
-
     prescription_id: str
-
     patient_id: str
-
     doctor_username: str
-
     medication_name: str
-
     dosage: str
-
     frequency: str
-
     duration: str
-
     instructions: str | None = None
-
     model_config = ConfigDict(
         from_attributes=True
     )

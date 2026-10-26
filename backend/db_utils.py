@@ -195,12 +195,12 @@ def create_medical_field(
     db: Session,
     field_name: str,
     field_type: str,
-    created_by: str
+    created_by: str,
 ):
     field = MedicalField(
         field_name=field_name,
         field_type=field_type,
-        created_by=created_by
+        created_by=created_by,
     )
 
     db.add(field)

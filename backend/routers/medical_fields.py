@@ -38,8 +38,6 @@ def add_medical_field(
     return create_medical_field(
         db=db,
         field_name=field.field_name,
-        field_type=field.field_type,
-        ai_enabled=field.ai_enabled,
+        field_type=field.field_type, 
         created_by=current_user["username"],
     )
-    
